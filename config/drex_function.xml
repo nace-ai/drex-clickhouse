@@ -1,0 +1,104 @@
+<!--
+    Drex for ClickHouse: drex_noul, drex_choice, drex_score, drex_decide and drex_decide_image.
+
+    ClickHouse loads this file from its config directory (user_defined_executable_functions_config is
+    *_function.*ml by default). Each function is a pool of drex_udf.py processes answering RowBinary blocks.
+
+    Edit together:
+    - pool_size: processes per function and replica; one query uses at most max_threads of them.
+    - concurrency in the command: requests in flight per process. pool_size x concurrency x replicas is the most
+      requests in flight per function; keep it within your account's limit (8 in flight on a free account, 16 on a
+      paid one). Drex's 429s are retried, so going over costs time, not answers.
+    - command_read_timeout: the longest ClickHouse waits for the next row. A request takes at most about 180 s
+      (5 attempts within 120 s, each up to 60 s), so keep it above that.
+    - max_command_execution_time: how long a query waits for a free process of the pool, in seconds.
+    - The paths: the virtual environment with nace-sdk, the script, and the key file, which only the clickhouse user
+      may read. To use another endpoint, add the base-url option with an https URL (the default is
+      https://console.nace.ai).
+-->
+<functions>
+    <function>
+        <type>executable_pool</type>
+        <name>drex_noul</name>
+        <return_type>Nullable(Float64)</return_type>
+        <argument><type>Nullable(String)</type><name>input</name></argument>
+        <argument><type>Nullable(String)</type><name>instructions</name></argument>
+        <argument><type>Nullable(String)</type><name>criteria</name></argument>
+        <argument><type>Nullable(String)</type><name>model</name></argument>
+        <format>RowBinary</format>
+        <send_chunk_header>1</send_chunk_header>
+        <execute_direct>0</execute_direct>
+        <command>exec /opt/drex-clickhouse/venv/bin/python3 -I /opt/drex-clickhouse/drex_udf.py --function noul --concurrency 4 --key-file /etc/clickhouse-server/drex/nace_api_key</command>
+        <pool_size>2</pool_size>
+        <command_read_timeout>200000</command_read_timeout>
+        <max_command_execution_time>3600</max_command_execution_time>
+        <stderr_reaction>log_last</stderr_reaction>
+    </function>
+    <function>
+        <type>executable_pool</type>
+        <name>drex_choice</name>
+        <return_type>Tuple(choice Nullable(String), probabilities Array(Tuple(value String, probability Float64)), confidence Nullable(Float64))</return_type>
+        <argument><type>Nullable(String)</type><name>input</name></argument>
+        <argument><type>Nullable(String)</type><name>instructions</name></argument>
+        <argument><type>Array(String)</type><name>labels</name></argument>
+        <argument><type>Nullable(String)</type><name>model</name></argument>
+        <format>RowBinary</format>
+        <send_chunk_header>1</send_chunk_header>
+        <execute_direct>0</execute_direct>
+        <command>exec /opt/drex-clickhouse/venv/bin/python3 -I /opt/drex-clickhouse/drex_udf.py --function choice --concurrency 4 --key-file /etc/clickhouse-server/drex/nace_api_key</command>
+        <pool_size>2</pool_size>
+        <command_read_timeout>200000</command_read_timeout>
+        <max_command_execution_time>3600</max_command_execution_time>
+        <stderr_reaction>log_last</stderr_reaction>
+    </function>
+    <function>
+        <type>executable_pool</type>
+        <name>drex_score</name>
+        <return_type>Tuple(score Nullable(Float64), probabilities Array(Tuple(index UInt32, value String, probability Float64)), confidence Nullable(Float64))</return_type>
+        <argument><type>Nullable(String)</type><name>input</name></argument>
+        <argument><type>Nullable(String)</type><name>instructions</name></argument>
+        <argument><type>Array(String)</type><name>levels</name></argument>
+        <argument><type>Nullable(String)</type><name>model</name></argument>
+        <format>RowBinary</format>
+        <send_chunk_header>1</send_chunk_header>
+        <execute_direct>0</execute_direct>
+        <command>exec /opt/drex-clickhouse/venv/bin/python3 -I /opt/drex-clickhouse/drex_udf.py --function score --concurrency 4 --key-file /etc/clickhouse-server/drex/nace_api_key</command>
+        <pool_size>2</pool_size>
+        <command_read_timeout>200000</command_read_timeout>
+        <max_command_execution_time>3600</max_command_execution_time>
+        <stderr_reaction>log_last</stderr_reaction>
+    </function>
+    <function>
+        <type>executable_pool</type>
+        <name>drex_decide</name>
+        <return_type>Nullable(String)</return_type>
+        <argument><type>Nullable(String)</type><name>state</name></argument>
+        <argument><type>Nullable(String)</type><name>questions</name></argument>
+        <argument><type>Nullable(String)</type><name>model</name></argument>
+        <format>RowBinary</format>
+        <send_chunk_header>1</send_chunk_header>
+        <execute_direct>0</execute_direct>
+        <command>exec /opt/drex-clickhouse/venv/bin/python3 -I /opt/drex-clickhouse/drex_udf.py --function decide --concurrency 4 --key-file /etc/clickhouse-server/drex/nace_api_key</command>
+        <pool_size>2</pool_size>
+        <command_read_timeout>200000</command_read_timeout>
+        <max_command_execution_time>3600</max_command_execution_time>
+        <stderr_reaction>log_last</stderr_reaction>
+    </function>
+    <function>
+        <type>executable_pool</type>
+        <name>drex_decide_image</name>
+        <return_type>Nullable(String)</return_type>
+        <argument><type>Nullable(String)</type><name>state</name></argument>
+        <argument><type>Array(String)</type><name>images</name></argument>
+        <argument><type>Nullable(String)</type><name>questions</name></argument>
+        <argument><type>Nullable(String)</type><name>model</name></argument>
+        <format>RowBinary</format>
+        <send_chunk_header>1</send_chunk_header>
+        <execute_direct>0</execute_direct>
+        <command>exec /opt/drex-clickhouse/venv/bin/python3 -I /opt/drex-clickhouse/drex_udf.py --function decide_image --concurrency 4 --key-file /etc/clickhouse-server/drex/nace_api_key</command>
+        <pool_size>2</pool_size>
+        <command_read_timeout>200000</command_read_timeout>
+        <max_command_execution_time>3600</max_command_execution_time>
+        <stderr_reaction>log_last</stderr_reaction>
+    </function>
+</functions>

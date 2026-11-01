@@ -1,0 +1,18 @@
+# The integration tests write their functions here (tests/clickhouse_functions.py)
+tests/.generated/
+# Your API key for docker-compose.yml
+/secrets/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.zip
+# Zips with your API key (cloud/build_bundles.py), and Terraform state
+cloud/dist/
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+tfplan
+.venv/
+# Maintainers' local notes
+docs/internal/

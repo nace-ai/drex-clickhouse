@@ -1,0 +1,100 @@
+#
+# Runs the tests that need no Drex account: the script against the mock Drex API (tests/test_udf.py), the Cloud
+# bundles and their Terraform module, the mock's own checks, and the functions through ClickHouse in Docker against
+# the mock (tests/test_clickhouse.py).
+#
+name: Mock Tests
+on:
+  # A pull request runs on its pull_request event alone, not again for the push
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  script:
+    name: Script on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is Ubuntu 22.04's, which the ClickHouse image is built on; 3.11 is ClickHouse Cloud's
+        python: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: python -m pip install --quiet -r requirements-dev.txt
+
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Test
+        run: python -m pytest tests/test_udf.py tests/test_cloud.py tests/mock -v
+
+  terraform:
+    name: Cloud Terraform module
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -diff
+
+      - run: terraform init -backend=false -input=false
+
+      - run: terraform validate
+
+  clickhouse:
+    name: ClickHouse ${{ matrix.clickhouse }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The LTS docker-compose.yml pins, and the latest release, which ClickHouse Cloud runs
+        clickhouse: ['26.8.36.3', '26.10.3.7']
+    env:
+      CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
+      COMPOSE: docker compose -f docker-compose.yml -f tests/docker-compose.test.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: python -m pip install --quiet -r requirements-dev.txt
+
+      - name: Start ClickHouse and the mock
+        run: |
+          python tests/clickhouse_functions.py tests/.generated/drex_test_function.xml
+          $COMPOSE up -d --build --wait
+
+      - name: Test
+        env:
+          DREX_CLICKHOUSE_URL: http://127.0.0.1:8123
+          DREX_MOCK_URL: http://127.0.0.1:8787
+        run: python -m pytest tests/test_clickhouse.py -v
+
+      - name: ClickHouse's log
+        if: failure()
+        run: $COMPOSE logs clickhouse | tail -200
+
+      - name: Stop
+        if: always()
+        run: $COMPOSE down -v

@@ -1,0 +1,54 @@
+#
+# Runs the shipped functions against the production Drex API using NACE_LIVE_API_KEY (tests/live). These tests make
+# billed requests; enable a schedule only after configuring a dedicated test account.
+#
+name: Live Tests
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  live-tests:
+    name: Functions against the live API
+    runs-on: ubuntu-latest
+    env:
+      NACE_API_KEY: ${{ secrets.NACE_LIVE_API_KEY }}
+    steps:
+      - name: Check the API key
+        run: |
+          if [ -z "$NACE_API_KEY" ]; then
+            echo "::error::The NACE_LIVE_API_KEY secret is not available to this repository"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: python -m pip install --quiet -r requirements-dev.txt
+
+      - name: Start ClickHouse
+        run: |
+          mkdir -p secrets
+          (umask 077 && printf '%s' "$NACE_API_KEY" > secrets/nace_api_key)
+          # The clickhouse user in the container (uid 101) reads it
+          sudo chown 101:101 secrets/nace_api_key
+          docker compose up -d --build --wait
+
+      - name: Run the live tests
+        env:
+          DREX_LIVE: '1'
+          DREX_CLICKHOUSE_URL: http://127.0.0.1:8123
+        run: python -m pytest tests/live -v -s
+
+      - name: Stop
+        if: always()
+        run: |
+          docker compose down -v
+          sudo rm -f secrets/nace_api_key

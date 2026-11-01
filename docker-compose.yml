@@ -1,0 +1,32 @@
+# ClickHouse with Drex's functions. Put your Nace API key in ./secrets/nace_api_key first (see README.md), then:
+#
+#   docker compose up -d --build --wait
+#   docker compose exec clickhouse clickhouse-client
+services:
+  clickhouse:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        CLICKHOUSE_VERSION: ${CLICKHOUSE_VERSION:-26.8.36.3}
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    environment:
+      # The image's default user, with no password, reachable only from this machine (ports above)
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - ./secrets/nace_api_key:/etc/clickhouse-server/drex/nace_api_key:ro
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+volumes:
+  clickhouse-data:

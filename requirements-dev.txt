@@ -1,0 +1,5 @@
+-r udf/requirements.txt
+pytest==9.2.0
+# The mock's own tests validate its answers against Drex's schemas with it
+jsonschema==4.26.0
+ruff==0.17.3
