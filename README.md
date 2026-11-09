@@ -20,6 +20,8 @@ functions run on self-hosted ClickHouse (a Python script ClickHouse runs as an e
 Cloud (the same script, uploaded as a Python UDF). They need ClickHouse 26.7 or later: earlier versions pass
 arguments to executable UDFs in the types they have rather than the declared ones.
 
+**Also from Drex:** [Drex Browser Use](https://github.com/nace-ai/drex-browser-harness-pub), an AI browser agent and MCP server. One sentence fills a DoorDash cart in 16 moves.
+
 [Getting started](#getting-started) · [Examples](#examples) · [API reference](docs/API.md) ·
 [ClickHouse Cloud](#clickhouse-cloud)
 
